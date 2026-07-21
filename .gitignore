@@ -1,0 +1,15 @@
+node_modules/
+pnpm-lock.yaml
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Build caches
+*.tsbuildinfo
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/

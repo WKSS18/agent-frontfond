@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, type ComponentRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { Attachments, Sender, type AttachmentsProps } from "@ant-design/x";
 import { App as AntdApp, Button, Tooltip } from "antd";
 import { BookOpen, Bot, File, FileText, Image, Paperclip, Plus, UserRound } from "lucide-react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { api, ApiError, type ChatStreamCallbacks } from "../api/client";
-import type { AgentMessage, AttachmentInfo, ChatFormDescriptor, Note } from "../types";
+import type { AgentMessage, AttachmentInfo, ChatFormDescriptor, Note, UploadedFile } from "../types";
 import { NoteCreateForm } from "./NoteCreateForm";
 
 
@@ -19,6 +21,11 @@ interface DisplayMessage extends AgentMessage {
   pending?: boolean;
 }
 
+interface ConversationTurn {
+  key: number;
+  messages: DisplayMessage[];
+}
+
 const STARTER_PROMPTS = [
   "总结我的最近笔记",
   "RAG 的核心流程是什么？",
@@ -26,6 +33,7 @@ const STARTER_PROMPTS = [
 ];
 const ACCEPTED_FILES = ".txt,.md,.csv,.pdf,.docx,.png,.jpg,.jpeg,.webp";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MARKDOWN_PLUGINS = [remarkGfm];
 
 export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   const { message: messageApi } = AntdApp.useApp();
@@ -38,12 +46,18 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   const [question, setQuestion] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(Boolean(sessionId));
   const [noteCount, setNoteCount] = useState(0);
-  const messageEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
   const attachmentsRef = useRef<ComponentRef<typeof Attachments>>(null);
   const skipNextHistoryLoadRef = useRef(false);
+  const uploadAttemptRef = useRef(0);
+  const autoFollowRef = useRef(true);
+  const scrollFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     api.listNotes(token)
@@ -88,9 +102,34 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
     };
   }, [sessionId, storageKey, token]);
 
+  const scheduleScrollToBottom = useCallback((force = false) => {
+    if (!force && !autoFollowRef.current) return;
+    if (force) autoFollowRef.current = true;
+    if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+    // 流式 delta 可能非常密集，每帧最多滚动一次，避免反复重启 smooth 动画导致抖动。
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      const container = chatScrollRef.current;
+      if (container) container.scrollTop = container.scrollHeight;
+      scrollFrameRef.current = null;
+    });
+  }, []);
+
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, isSending]);
+    scheduleScrollToBottom();
+  }, [messages, isSending, scheduleScrollToBottom]);
+
+  useEffect(() => {
+    const messageList = messageListRef.current;
+    if (!messageList) return;
+    // Markdown 重排、图片加载都会改变高度，高度变化后继续跟随底部。
+    const observer = new ResizeObserver(() => scheduleScrollToBottom());
+    observer.observe(messageList);
+    return () => observer.disconnect();
+  }, [messages.length, scheduleScrollToBottom]);
+
+  useEffect(() => () => {
+    if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+  }, []);
 
   useEffect(() => {
     if (!selectedFile?.type.startsWith("image/")) {
@@ -102,24 +141,39 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
     return () => URL.revokeObjectURL(objectUrl);
   }, [selectedFile]);
 
+  const removeSelectedFile = () => {
+    uploadAttemptRef.current += 1;
+    const orphan = uploadedFile;
+    setSelectedFile(null);
+    setUploadedFile(null);
+    setIsUploading(false);
+    if (orphan) {
+      void api.deleteUploadedFile(token, orphan.object_key).catch(() => undefined);
+    }
+  };
+
   const sendMessage = async (content: string) => {
     const trimmed = content.trim();
     const uploadFile = selectedFile;
-    if ((!trimmed && !uploadFile) || isSending) return;
+    const uploadedAttachment = uploadedFile;
+    if ((!trimmed && !uploadFile) || isSending || isUploading) return;
+    if (uploadFile && !uploadedAttachment) {
+      void messageApi.warning("附件正在上传，请稍候。");
+      return;
+    }
 
+    // 点击发送后立即清空编辑区；后续上传或分析失败也不回填已发送内容。
     setQuestion("");
-    if (!uploadFile) setSelectedFile(null);
+    setSelectedFile(null);
+    setUploadedFile(null);
     setIsSending(true);
+    autoFollowRef.current = true;
 
+    // 附件名已在 attachment 中保存，消息正文只展示用户真正发送的语句。
     const displayContent = uploadFile
-      ? `上传文件：${uploadFile.name}${trimmed ? `\n分析要求：${trimmed}` : ""}`
+      ? trimmed || "请总结并分析这份文件"
       : trimmed;
-    const attachment: AttachmentInfo | null = uploadFile ? {
-      name: uploadFile.name,
-      media_type: uploadFile.type || "application/octet-stream",
-      size: uploadFile.size,
-      url: selectedPreviewUrl ?? undefined,
-    } : null;
+    const attachment: AttachmentInfo | null = uploadedAttachment;
 
     const optimisticMessage: DisplayMessage = {
       id: -Date.now(),
@@ -147,6 +201,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
       pending: true,
     };
     setMessages((current) => [...current, optimisticMessage, streamingMessage]);
+    scheduleScrollToBottom(true);
 
     try {
       const callbacks: ChatStreamCallbacks = {
@@ -196,20 +251,13 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           }));
         },
       };
-      if (uploadFile) {
-        const uploaded = await api.uploadFile(token, uploadFile);
-        setMessages((current) => current.map((message) =>
-          message.id === optimisticMessage.id
-            ? { ...message, attachment: uploaded }
-            : message,
-        ));
-        setSelectedFile(null);
+      if (uploadFile && uploadedAttachment) {
         await api.streamFileAnalysis(
           token,
           uploadFile,
           trimmed,
           sessionId,
-          uploaded.object_key,
+          uploadedAttachment.object_key,
           callbacks,
         );
       } else {
@@ -217,14 +265,15 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
       }
     } catch {
       setMessages((current) => current
-        .filter((message) => message.id !== assistantMessageId || Boolean(message.content))
+        .filter((message) => {
+          if (message.id === assistantMessageId && !message.content) return false;
+          return true;
+        })
         .map((message) =>
           message.id === optimisticMessage.id || message.id === assistantMessageId
             ? { ...message, pending: false }
             : message,
         ));
-      setQuestion(trimmed);
-      if (uploadFile) setSelectedFile(uploadFile);
     } finally {
       setIsSending(false);
     }
@@ -236,7 +285,8 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
     setSessionId(null);
     setMessages([]);
     setQuestion("");
-    setSelectedFile(null);
+    removeSelectedFile();
+    autoFollowRef.current = true;
   };
 
   const selectFile = (file: File): boolean => {
@@ -249,18 +299,47 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
         void messageApi.warning("文件不能超过 10 MB");
         return false;
       }
+
+      const previousUpload = uploadedFile;
+      const attemptId = uploadAttemptRef.current + 1;
+      uploadAttemptRef.current = attemptId;
+      if (previousUpload) {
+        void api.deleteUploadedFile(token, previousUpload.object_key).catch(() => undefined);
+      }
       setSelectedFile(file);
+      setUploadedFile(null);
+      setIsUploading(true);
+      void api.uploadFile(token, file)
+        .then((result) => {
+          if (uploadAttemptRef.current !== attemptId) {
+            // 用户在上传期间移除或替换了附件，清理迟到的对象。
+            void api.deleteUploadedFile(token, result.object_key).catch(() => undefined);
+            return;
+          }
+          setUploadedFile(result);
+        })
+        .catch(() => {
+          if (uploadAttemptRef.current === attemptId) {
+            setSelectedFile(null);
+            setUploadedFile(null);
+          }
+        })
+        .finally(() => {
+          if (uploadAttemptRef.current === attemptId) setIsUploading(false);
+        });
       return true;
   };
 
-  const attachmentItems: NonNullable<AttachmentsProps["items"]> = selectedFile ? [{
-    uid: "selected-file",
-    name: selectedFile.name,
-    size: selectedFile.size,
-    type: selectedFile.type,
-    status: "done",
-    thumbUrl: selectedPreviewUrl ?? undefined,
-  }] : [];
+  const attachmentItems: NonNullable<AttachmentsProps["items"]> = useMemo(() => (
+    selectedFile ? [{
+      uid: "selected-file",
+      name: selectedFile.name,
+      size: selectedFile.size,
+      type: selectedFile.type,
+      status: isUploading ? "uploading" : "done",
+      thumbUrl: selectedPreviewUrl ?? undefined,
+    }] : []
+  ), [isUploading, selectedFile, selectedPreviewUrl]);
 
   return (
     <section className="chat-page">
@@ -281,7 +360,16 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
         </div>
       </header>
 
-      <div className="chat-scroll" aria-live="polite">
+      <div
+        ref={chatScrollRef}
+        className="chat-scroll"
+        aria-live="polite"
+        onScroll={(event) => {
+          const container = event.currentTarget;
+          const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+          autoFollowRef.current = distanceToBottom < 96;
+        }}
+      >
         {isLoadingHistory ? (
           <div className="conversation-loading"><span /><span /><span /></div>
         ) : messages.length === 0 ? (
@@ -299,9 +387,12 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
             </div>
           </div>
         ) : (
-          <div className="message-list">
-            {messages.map((message) => {
+          <div ref={messageListRef} className="message-list">
+            {groupMessagesIntoTurns(messages).map((turn) => (
+              <section key={turn.key} className="chat-turn">
+              {turn.messages.map((message) => {
               const usedNotes = message.usedNotes ?? message.used_notes;
+              const displayContent = getDisplayContent(message);
               return (
               <article key={message.id} className={`message message--${message.role}`}>
                 <div className="message-avatar" aria-hidden="true">
@@ -327,11 +418,13 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
                     />
                   ) : (
                     <div className={`message-content ${message.pending ? "is-pending" : ""}`}>
-                      {message.role === "assistant" && message.pending && !message.content ? (
+                      {message.role === "assistant" && message.pending && !displayContent ? (
                       <span className="typing-indicator" aria-label="Agent 正在思考">
                         <span /><span /><span />
                       </span>
-                      ) : message.content}
+                      ) : message.role === "assistant" ? (
+                        <Markdown remarkPlugins={MARKDOWN_PLUGINS}>{displayContent}</Markdown>
+                      ) : displayContent}
                     </div>
                   )}
                   {usedNotes.length > 0 && (
@@ -350,8 +443,9 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
                 </div>
               </article>
               );
-            })}
-            <div ref={messageEndRef} />
+              })}
+              </section>
+            ))}
           </div>
         )}
       </div>
@@ -382,7 +476,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
               title="附件"
               open={Boolean(selectedFile)}
               forceRender
-              onOpenChange={(open) => { if (!open) setSelectedFile(null); }}
+              onOpenChange={(open) => { if (!open) removeSelectedFile(); }}
             >
               <Attachments
                 ref={attachmentsRef}
@@ -395,7 +489,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
                   return false;
                 }}
                 onRemove={() => {
-                  setSelectedFile(null);
+                  removeSelectedFile();
                   return true;
                 }}
               />
@@ -420,19 +514,49 @@ function AttachmentPreview({ attachment }: { attachment: AttachmentInfo }) {
           <img src={attachment.url} alt={attachment.name} />
         </a>
       ) : isImage ? <Image size={19} /> : <File size={19} />}
-      <span className="message-attachment-meta">
-        <strong>{attachment.name}</strong>
-        <small>
-          {formatFileSize(attachment.size)}
-          {attachment.extraction_method ? ` · ${attachment.extraction_method}` : ""}
-        </small>
-      </span>
+      {!isImage && (
+        <span className="message-attachment-meta">
+          <strong>{attachment.name}</strong>
+          <small>
+            {formatFileSize(attachment.size)}
+            {attachment.extraction_method ? ` · ${attachment.extraction_method}` : ""}
+          </small>
+        </span>
+      )}
     </div>
   );
 }
 
+function groupMessagesIntoTurns(messages: DisplayMessage[]): ConversationTurn[] {
+  const turns: ConversationTurn[] = [];
+  for (const message of messages) {
+    if (message.role === "user" || turns.length === 0) {
+      turns.push({ key: message.id, messages: [message] });
+      continue;
+    }
+    turns[turns.length - 1].messages.push(message);
+  }
+  return turns;
+}
+
 function isChatFormDescriptor(value: AgentMessage["message_data"]): value is ChatFormDescriptor {
   return Boolean(value && "kind" in value && value.kind === "note_create");
+}
+
+function getDisplayContent(message: DisplayMessage): string {
+  if (message.role !== "user" || !message.attachment) return message.content;
+
+  // 兼容旧历史数据：旧版曾把文件名和分析标签一起存入消息正文。
+  const analysisPrefix = "分析要求：";
+  const analysisStart = message.content.indexOf(analysisPrefix);
+  if (analysisStart >= 0) {
+    return message.content.slice(analysisStart + analysisPrefix.length).trim()
+      || "请总结并分析这份文件";
+  }
+  if (message.content.startsWith("上传文件：")) {
+    return "请总结并分析这份文件";
+  }
+  return message.content;
 }
 
 function formatFileSize(bytes: number): string {

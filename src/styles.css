@@ -652,6 +652,18 @@ button:disabled {
   padding: 34px 0 42px;
 }
 
+.chat-turn {
+  position: relative;
+}
+
+/* 每个问题在对应回答滚动期间吸顶，下一个问题会自然将它顶走。 */
+.chat-turn > .message--user {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: linear-gradient(180deg, var(--surface-soft) 82%, rgba(245, 246, 242, 0));
+}
+
 .message {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
@@ -675,8 +687,34 @@ button:disabled {
 }
 
 .message--user .message-avatar {
-  color: #5d4a2e;
-  background: #f0e8d8;
+  display: none;
+}
+
+.message--user {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: end;
+  border-bottom: 0;
+}
+
+.message--user .message-body {
+  max-width: 72%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 9px;
+}
+
+.message--user .message-meta {
+  display: none;
+}
+
+.message--user .message-content {
+  max-width: 100%;
+  padding: 11px 16px;
+  border-radius: 18px;
+  color: #252525;
+  background: #f0f0f0;
+  line-height: 1.55;
 }
 
 .message-body {
@@ -710,6 +748,105 @@ button:disabled {
 
 .message-content.is-pending {
   color: var(--muted);
+}
+
+.message--assistant .message-content {
+  white-space: normal;
+}
+
+.message--assistant .message-content > :first-child {
+  margin-top: 0;
+}
+
+.message--assistant .message-content > :last-child {
+  margin-bottom: 0;
+}
+
+.message--assistant .message-content p,
+.message--assistant .message-content ul,
+.message--assistant .message-content ol,
+.message--assistant .message-content blockquote,
+.message--assistant .message-content pre,
+.message--assistant .message-content table {
+  margin: 0 0 12px;
+}
+
+.message--assistant .message-content h1,
+.message--assistant .message-content h2,
+.message--assistant .message-content h3,
+.message--assistant .message-content h4 {
+  margin: 22px 0 9px;
+  color: #202a25;
+  line-height: 1.35;
+}
+
+.message--assistant .message-content h1 { font-size: 21px; }
+.message--assistant .message-content h2 { font-size: 18px; }
+.message--assistant .message-content h3 { font-size: 16px; }
+.message--assistant .message-content h4 { font-size: 14px; }
+
+.message--assistant .message-content ul,
+.message--assistant .message-content ol {
+  padding-left: 22px;
+}
+
+.message--assistant .message-content li + li {
+  margin-top: 5px;
+}
+
+.message--assistant .message-content blockquote {
+  padding: 8px 12px;
+  border-left: 3px solid #9fc5bc;
+  color: var(--muted);
+  background: #eef4f1;
+}
+
+.message--assistant .message-content code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: #9a3412;
+  background: #ecefea;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9em;
+}
+
+.message--assistant .message-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 14px;
+  border: 1px solid #303a35;
+  border-radius: 8px;
+  color: #e7eee9;
+  background: #202824;
+}
+
+.message--assistant .message-content pre code {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+}
+
+.message--assistant .message-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.message--assistant .message-content th,
+.message--assistant .message-content td {
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  text-align: left;
+}
+
+.message--assistant .message-content th {
+  background: #edf1ed;
+}
+
+.message--assistant .message-content a {
+  color: var(--teal);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
 .source-notes {
@@ -953,31 +1090,29 @@ button:disabled {
 }
 
 .message-attachment--image {
-  width: min(360px, 100%);
+  width: min(280px, 100%);
   display: block;
   overflow: hidden;
   padding: 0;
-  background: #f7f8f6;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
 }
 
 .message-image-link {
   display: block;
   width: 100%;
-  max-height: 260px;
+  max-height: 280px;
   overflow: hidden;
-  border-bottom: 1px solid #dce4e0;
+  border-radius: 14px;
   background: #eef2ef;
 }
 
 .message-image-link img {
   width: 100%;
-  max-height: 260px;
+  max-height: 280px;
   display: block;
-  object-fit: contain;
-}
-
-.message-attachment--image .message-attachment-meta {
-  padding: 9px 11px 10px;
+  object-fit: cover;
 }
 
 .composer-error {
@@ -1381,6 +1516,14 @@ button:disabled {
     grid-template-columns: 30px minmax(0, 1fr);
     gap: 10px;
     padding: 16px 0;
+  }
+
+  .message--user {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .message--user .message-body {
+    max-width: 86%;
   }
 
   .message-avatar {

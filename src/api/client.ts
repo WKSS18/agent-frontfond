@@ -270,6 +270,14 @@ export const api = {
     return request<UploadedFile>("/uploads", { method: "POST", body: form }, token);
   },
 
+  deleteUploadedFile(token: string, objectKey: string): Promise<void> {
+    return request<void>(
+      "/uploads",
+      { method: "DELETE", body: JSON.stringify({ object_key: objectKey }) },
+      token,
+    );
+  },
+
   submitNoteForm(
     token: string,
     messageId: number,
