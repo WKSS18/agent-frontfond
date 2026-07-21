@@ -566,8 +566,14 @@ function formatFileSize(bytes: number): string {
 }
 
 function formatMessageTime(value: string): string {
+  // 兼容旧接口：SQLite UTC 时间曾以无时区字符串返回，浏览器会误当成本地时间。
+  const normalizedValue = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`;
+  const date = new Date(normalizedValue);
+  if (Number.isNaN(date.getTime())) return "--:--";
+
   return new Intl.DateTimeFormat("zh-CN", {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(value));
+    hour12: false,
+  }).format(date);
 }
