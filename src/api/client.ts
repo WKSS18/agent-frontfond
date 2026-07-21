@@ -1,3 +1,9 @@
+/**
+ * 唯一网络访问层。
+ *
+ * 职责包括：统一响应信封、Bearer Token、普通 HTTP 错误、GET 请求去重、文件上传，
+ * 以及 POST SSE 的流读取与事件分发。页面组件不直接拼 URL，也不处理网络半包。
+ */
 import type {
   AgentChatResponse,
   AgentMessage,
@@ -12,6 +18,7 @@ import { notifyApiError } from "./feedback";
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+// 只合并“尚未完成”的相同 GET，不做长期缓存，避免 React StrictMode 重复请求。
 const pendingGetRequests = new Map<string, Promise<unknown>>();
 
 export class ApiError extends Error {
@@ -68,6 +75,7 @@ async function executeRequest<T>(
   options: RequestInit,
   token?: string,
 ): Promise<T> {
+  // FormData 必须由浏览器自动设置 multipart boundary，不能手动覆盖 Content-Type。
   const headers = new Headers(options.headers);
   if (
     options.body
@@ -126,6 +134,7 @@ async function streamChat(
   sessionId: number | null,
   callbacks: ChatStreamCallbacks,
 ): Promise<void> {
+  // 原生 EventSource 只支持 GET 且不便设置 Authorization，所以使用 fetch 读取 SSE。
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}/agent/chat/stream`, {
@@ -152,6 +161,7 @@ async function streamFileAnalysis(
   objectKey: string,
   callbacks: ChatStreamCallbacks,
 ): Promise<void> {
+  // 文件分析既需要二进制文件，也要携带会话、用户提示词和已上传 OSS 的对象键。
   const form = new FormData();
   form.append("file", file);
   form.append("prompt", prompt);
@@ -175,6 +185,10 @@ async function consumeStreamResponse(
   response: Response,
   callbacks: ChatStreamCallbacks,
 ): Promise<void> {
+  /**
+   * ReadableStream 的 chunk 是传输层分块，不等于一条 SSE 消息。
+   * 因此先累计 buffer，再按空行切出完整事件，最后按 event 名分发给页面回调。
+   */
   if (!response.ok) {
     try {
       const payload = await response.json() as ApiResponse<null>;
@@ -235,6 +249,7 @@ async function consumeStreamResponse(
 }
 
 export const api = {
+  // 组件只调用语义化方法，接口路径、请求格式和鉴权细节全部收敛在此对象中。
   register(email: string, password: string): Promise<User> {
     return request<User>("/auth/register", {
       method: "POST",

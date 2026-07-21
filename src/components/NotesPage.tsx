@@ -1,3 +1,4 @@
+/** 知识笔记工作台：搜索列表、创建/编辑器、删除确认和数据刷新。 */
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { FilePlus2, Search, Trash2, X } from "lucide-react";
 
@@ -25,6 +26,7 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
   );
 
   useEffect(() => {
+    // 简单防抖避免用户每输入一个字符就立即发起搜索请求。
     const timeout = window.setTimeout(() => {
       setIsLoading(true);
       api.listNotes(token, search.trim())
@@ -47,6 +49,7 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
   }, [selectedId, selectedNote]);
 
   const refreshNotes = async () => {
+    // 修改后既刷新当前列表，也通知 ChatPage 更新知识库状态。
     const result = await api.listNotes(token, search.trim());
     setNotes(result);
     onNotesChanged();

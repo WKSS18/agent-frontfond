@@ -1,3 +1,7 @@
+/**
+ * 聊天内的受控“创建笔记”表单。
+ * descriptor 决定文案和字段，实际提交地址固定在代码中，避免执行模型生成的动作。
+ */
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, LoaderCircle, Save } from "lucide-react";
 
@@ -43,6 +47,7 @@ export function NoteCreateForm({ token, messageId, descriptor, onCreated }: Note
   };
 
   const completedTitle = createdNote?.title ?? descriptor.result?.title;
+  // 本次提交和历史恢复共用一个完成态：刷新页面不会再次显示可提交表单。
   if (descriptor.status === "completed" || completedTitle) {
     return (
       <div className="inline-form-success" role="status">

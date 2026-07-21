@@ -1,3 +1,4 @@
+/** 已登录后的应用外壳：桌面/移动导航、账户区域和页面级视图切换。 */
 import { useState } from "react";
 import { BookOpen, LogOut, MessageSquareText } from "lucide-react";
 
@@ -15,6 +16,7 @@ interface AppShellProps {
 export function AppShell({ token, user, onLogout }: AppShellProps) {
   const [view, setView] = useState<AppView>("chat");
   const [noteRevision, setNoteRevision] = useState(0);
+  // Notes 修改后递增版本号，让常驻 ChatPage 重新获取知识库数量而无需全局状态库。
 
   return (
     <div className="app-shell">

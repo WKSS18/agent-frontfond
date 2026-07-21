@@ -1,3 +1,9 @@
+/**
+ * 聊天主页面。
+ *
+ * 负责协调会话恢复、乐观消息、SSE 流式增量、OSS 附件、Markdown 渲染、自动滚动
+ * 和最近问题吸顶。网络协议集中在 api/client.ts，本文件只维护页面交互与展示状态。
+ */
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { Attachments, Sender, type AttachmentsProps } from "@ant-design/x";
 import { App as AntdApp, Button, Tooltip } from "antd";
@@ -17,11 +23,13 @@ interface ChatPageProps {
 }
 
 interface DisplayMessage extends AgentMessage {
+  /** 流式阶段暂存引用和 pending 状态，历史消息仍使用服务端字段。 */
   usedNotes?: Note[];
   pending?: boolean;
 }
 
 interface ConversationTurn {
+  /** 一个用户问题和其后的助手消息组成一个 turn，也是问题吸顶的布局边界。 */
   key: number;
   messages: DisplayMessage[];
 }
@@ -38,6 +46,7 @@ const MARKDOWN_PLUGINS = [remarkGfm];
 export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   const { message: messageApi } = AntdApp.useApp();
   const storageKey = `fieldnote_session_${userId}`;
+  // 会话 ID 按用户持久化，刷新页面后可以向后端恢复同一段聊天历史。
   const [sessionId, setSessionId] = useState<number | null>(() => {
     const stored = localStorage.getItem(storageKey);
     return stored ? Number(stored) : null;
@@ -51,6 +60,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(Boolean(sessionId));
   const [noteCount, setNoteCount] = useState(0);
+  // 高频流更新涉及的 DOM 和流程标记用 ref 保存，避免无意义的额外渲染。
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const attachmentsRef = useRef<ComponentRef<typeof Attachments>>(null);
@@ -60,12 +70,14 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   const scrollFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // noteRevision 由笔记页修改成功后递增，用于同步顶部知识库数量。
     api.listNotes(token)
       .then((notes) => setNoteCount(notes.length))
       .catch(() => setNoteCount(0));
   }, [token, noteRevision]);
 
   useEffect(() => {
+    // 新会话已由乐观消息维护，skipNextHistoryLoadRef 防止立刻重复拉取并覆盖界面。
     if (!sessionId) {
       setMessages([]);
       setIsLoadingHistory(false);
@@ -115,6 +127,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   }, []);
 
   useEffect(() => {
+    // 消息新增或流式 delta 到达时跟随底部；用户向上阅读后可暂停自动跟随。
     scheduleScrollToBottom();
   }, [messages, isSending, scheduleScrollToBottom]);
 
@@ -132,6 +145,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   }, []);
 
   useEffect(() => {
+    // Blob URL 仅用于上传前预览，文件切换或组件卸载时必须释放避免内存泄漏。
     if (!selectedFile?.type.startsWith("image/")) {
       setSelectedPreviewUrl(null);
       return;
@@ -142,6 +156,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   }, [selectedFile]);
 
   const removeSelectedFile = () => {
+    // 使旧上传回调失效，并清理已经上传但最终没有发送的 OSS 临时对象。
     uploadAttemptRef.current += 1;
     const orphan = uploadedFile;
     setSelectedFile(null);
@@ -153,6 +168,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   };
 
   const sendMessage = async (content: string) => {
+    // 先乐观插入用户/助手消息，再由 SSE 回调逐步补全会话 ID、正文、引用和真实消息 ID。
     const trimmed = content.trim();
     const uploadFile = selectedFile;
     const uploadedAttachment = uploadedFile;
@@ -230,6 +246,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           ));
         },
         onDelta: (delta) => {
+          // delta 只追加到当前 pending 助手消息，形成实时打字效果。
           setMessages((current) => current.map((message) =>
             message.id === assistantMessageId
               ? { ...message, content: message.content + delta }
@@ -290,6 +307,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   };
 
   const selectFile = (file: File): boolean => {
+    // 前端校验用于快速反馈；后端仍会做同样校验，浏览器不能作为安全边界。
       const suffix = `.${file.name.split(".").pop()?.toLowerCase() ?? ""}`;
       if (!ACCEPTED_FILES.split(",").includes(suffix)) {
         void messageApi.warning("仅支持 txt、md、csv、pdf、docx 和常见图片格式");
@@ -528,6 +546,7 @@ function AttachmentPreview({ attachment }: { attachment: AttachmentInfo }) {
 }
 
 function groupMessagesIntoTurns(messages: DisplayMessage[]): ConversationTurn[] {
+  // 用户消息开启新 turn，后续助手消息归入当前 turn，供 sticky 布局使用。
   const turns: ConversationTurn[] = [];
   for (const message of messages) {
     if (message.role === "user" || turns.length === 0) {

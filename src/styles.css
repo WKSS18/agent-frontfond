@@ -1,3 +1,4 @@
+/* ============================== 全局设计令牌与基础重置 ============================== */
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #202521;
@@ -66,6 +67,7 @@ button:disabled {
   opacity: 0.55;
 }
 
+/* ============================== 启动页与通用组件 ============================== */
 .boot-screen {
   min-height: 100vh;
   display: grid;
@@ -182,6 +184,7 @@ button:disabled {
   background: rgba(80, 93, 84, 0.1);
 }
 
+/* ============================== 登录与注册页 ============================== */
 .auth-layout {
   min-height: 100vh;
   display: grid;
@@ -388,6 +391,7 @@ button:disabled {
   justify-content: space-between;
 }
 
+/* ============================== 工作台外壳与导航 ============================== */
 .app-shell {
   width: 100%;
   height: 100vh;
@@ -559,6 +563,7 @@ button:disabled {
   color: var(--amber);
 }
 
+/* ============================== 聊天页与消息流 ============================== */
 .chat-page,
 .notes-page {
   height: 100%;
@@ -855,6 +860,7 @@ button:disabled {
   color: var(--muted);
 }
 
+/* 聊天内结构化表单消息：视觉上属于回答，但保留明确的可操作边界。 */
 .inline-note-form {
   width: min(100%, 560px);
   display: grid;
@@ -1008,6 +1014,7 @@ button:disabled {
   justify-content: center;
 }
 
+/* ============================== 输入区与附件 ============================== */
 .composer-region {
   flex: 0 0 auto;
   padding: 10px 30px 20px;
@@ -1135,6 +1142,7 @@ button:disabled {
   padding: 5px 7px 5px 12px;
 }
 
+/* ============================== 知识笔记工作台 ============================== */
 .notes-workspace {
   min-height: 0;
   display: grid;
@@ -1355,6 +1363,7 @@ button:disabled {
   font-size: 11px;
 }
 
+/* ============================== 响应式布局 ============================== */
 .mobile-nav {
   display: none;
 }

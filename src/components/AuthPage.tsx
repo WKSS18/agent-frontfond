@@ -1,3 +1,4 @@
+/** 登录/注册页：复用同一表单，注册成功后立即登录并加载当前用户。 */
 import { useState, type FormEvent } from "react";
 import { ArrowRight, BookOpen, Eye, EyeOff, MessageSquareText, ShieldCheck } from "lucide-react";
 
@@ -23,6 +24,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     setIsSubmitting(true);
 
     try {
+      // 注册接口只创建账号；随后仍走标准登录链路签发 Token，认证流程保持单一。
       if (mode === "register") {
         await api.register(email, password);
       }

@@ -1,3 +1,8 @@
+/**
+ * 前后端共享数据合同在前端的 TypeScript 映射。
+ * 这里不放组件状态，确保 API 返回结构变化时编译器能定位所有受影响调用方。
+ */
+
 export interface User {
   id: number;
   email: string;
@@ -28,6 +33,7 @@ export interface ChatFormField {
 }
 
 export interface ChatFormDescriptor {
+  /** kind 是受控组件的判别字段，不能执行模型任意生成的 URL 或动作。 */
   kind: "note_create";
   status?: "pending" | "completed";
   title: string;
@@ -42,6 +48,7 @@ export interface ChatFormDescriptor {
 }
 
 export interface AgentMessage {
+  /** message_type 决定消息使用 Markdown 还是业务表单渲染器。 */
   id: number;
   session_id: number;
   role: "user" | "assistant";
@@ -54,6 +61,7 @@ export interface AgentMessage {
 }
 
 export interface AttachmentInfo {
+  /** object_key 用于服务端重新签名；url 只是有有效期的临时预览地址。 */
   name: string;
   media_type: string;
   size: number;
