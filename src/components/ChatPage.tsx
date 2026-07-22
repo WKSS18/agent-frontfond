@@ -63,6 +63,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   // 高频流更新涉及的 DOM 和流程标记用 ref 保存，避免无意义的额外渲染。
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
+  const messageEndRef = useRef<HTMLDivElement>(null);
   const attachmentsRef = useRef<ComponentRef<typeof Attachments>>(null);
   const skipNextHistoryLoadRef = useRef(false);
   const uploadAttemptRef = useRef(0);
@@ -121,7 +122,9 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
     // 流式 delta 可能非常密集，每帧最多滚动一次，避免反复重启 smooth 动画导致抖动。
     scrollFrameRef.current = requestAnimationFrame(() => {
       const container = chatScrollRef.current;
-      if (container) container.scrollTop = container.scrollHeight;
+      // 流式输出期间必须即时跟随；平滑滚动会被连续 delta 反复重启，导致视图落后于内容。
+      if (container) container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
+      messageEndRef.current?.scrollIntoView({ block: "end", behavior: "auto" });
       scrollFrameRef.current = null;
     });
   }, []);
@@ -464,6 +467,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
               })}
               </section>
             ))}
+            <div ref={messageEndRef} className="message-end" aria-hidden="true" />
           </div>
         )}
       </div>

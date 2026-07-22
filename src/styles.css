@@ -576,7 +576,8 @@ button:disabled {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  scroll-behavior: smooth;
+  /* 流式内容由 JS 逐帧跟随，平滑滚动会使滚动位置持续落后。 */
+  scroll-behavior: auto;
 }
 
 .chat-empty {
@@ -655,6 +656,10 @@ button:disabled {
   width: min(860px, calc(100% - 42px));
   margin: 0 auto;
   padding: 34px 0 42px;
+}
+
+.message-end {
+  height: 1px;
 }
 
 .chat-turn {
