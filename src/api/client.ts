@@ -10,6 +10,8 @@ import type {
   AttachmentInfo,
   ChatFormDescriptor,
   Note,
+  DocumentImportTask,
+  ExecutionStep,
   TokenResponse,
   UploadedFile,
   User,
@@ -114,6 +116,7 @@ export interface ChatStreamCallbacks {
   onDelta: (content: string) => void;
   onForm: (form: ChatFormDescriptor) => void;
   onDone: (messageId: number) => void;
+  onThinking: (step: ExecutionStep) => void;
   onAttachment?: (attachment: AttachmentInfo) => void;
 }
 
@@ -126,6 +129,7 @@ type SsePayload = {
   form?: ChatFormDescriptor;
   code?: number;
   attachment?: AttachmentInfo;
+  step?: ExecutionStep;
 };
 
 async function streamChat(
@@ -220,6 +224,8 @@ async function consumeStreamResponse(
       callbacks.onSession(payload.session_id);
     } else if (eventName === "sources") {
       callbacks.onSources(payload.used_notes ?? []);
+    } else if (eventName === "thinking" && payload.step) {
+      callbacks.onThinking(payload.step);
     } else if (eventName === "delta") {
       callbacks.onDelta(payload.content ?? "");
     } else if (eventName === "form" && payload.form) {
@@ -279,10 +285,14 @@ export const api = {
     );
   },
 
-  importNoteDocument(token: string, file: File): Promise<Note> {
+  importNoteDocument(token: string, file: File): Promise<DocumentImportTask> {
     const form = new FormData();
     form.append("file", file);
-    return request<Note>("/notes/import", { method: "POST", body: form }, token);
+    return request<DocumentImportTask>("/notes/import", { method: "POST", body: form }, token);
+  },
+
+  getDocumentImportTask(token: string, taskId: number): Promise<DocumentImportTask> {
+    return request<DocumentImportTask>(`/notes/import/tasks/${taskId}`, {}, token);
   },
 
   uploadFile(token: string, file: File): Promise<UploadedFile> {

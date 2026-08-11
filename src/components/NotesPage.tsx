@@ -96,12 +96,27 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setImportStatus("正在上传并解析文档…");
+    setImportStatus("正在上传文档并创建 RabbitMQ 任务…");
     try {
-      const saved = await api.importNoteDocument(token, file);
-      setImportStatus("解析完成，已创建笔记；向量索引正在后台建立。几秒后即可在 Chat 中检索。");
+      let task = await api.importNoteDocument(token, file);
+      const labels: Record<string, string> = {
+        queued: "文档已排队，等待 RabbitMQ Worker…",
+        parsing: "后台 Worker 正在解析文档/OCR…",
+        creating_note: "解析完成，正在创建笔记和索引任务…",
+        retrying: "处理失败，正在等待自动重试…",
+      };
+      for (let attempt = 0; attempt < 180 && !["completed", "failed"].includes(task.status); attempt += 1) {
+        setImportStatus(labels[task.stage] ?? "后台正在处理文档…");
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        task = await api.getDocumentImportTask(token, task.id);
+      }
+      if (task.status !== "completed" || task.note_id === null) {
+        setImportStatus(task.last_error ? `导入失败：${task.last_error}` : "导入超时，请稍后刷新查看。 ");
+        return;
+      }
+      setImportStatus("文档解析完成，笔记已创建；Embedding 正在后台写入 Qdrant。");
       await refreshNotes();
-      setSelectedId(saved.id);
+      setSelectedId(task.note_id);
     } catch {
       setImportStatus("");
     }

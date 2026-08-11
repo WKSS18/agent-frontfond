@@ -793,6 +793,20 @@ button:disabled {
   color: var(--muted);
 }
 
+.execution-think {
+  max-width: 720px;
+  margin: 4px 0 14px;
+  color: #50615c;
+}
+
+.execution-think .ant-think-content {
+  padding-top: 10px;
+}
+
+.execution-think .ant-thought-chain {
+  font-size: 13px;
+}
+
 .message--assistant .message-content {
   white-space: normal;
 }

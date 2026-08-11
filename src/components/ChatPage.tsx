@@ -5,14 +5,14 @@
  * 和最近问题吸顶。网络协议集中在 api/client.ts，本文件只维护页面交互与展示状态。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
-import { Attachments, Sender, type AttachmentsProps } from "@ant-design/x";
+import { Attachments, Sender, Think, ThoughtChain, type AttachmentsProps } from "@ant-design/x";
 import { App as AntdApp, Button, Tooltip } from "antd";
 import { BookOpen, Bot, File, FileText, Image, Paperclip, Plus, UserRound } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { api, ApiError, type ChatStreamCallbacks } from "../api/client";
-import type { AgentMessage, AttachmentInfo, ChatFormDescriptor, Note, UploadedFile } from "../types";
+import type { AgentMessage, AttachmentInfo, ChatFormDescriptor, ExecutionStep, Note, UploadedFile } from "../types";
 import { NoteCreateForm } from "./NoteCreateForm";
 
 
@@ -27,6 +27,7 @@ interface DisplayMessage extends AgentMessage {
   usedNotes?: Note[];
   pending?: boolean;
   statusText?: string;
+  executionTrace?: ExecutionStep[];
 }
 
 interface ConversationTurn {
@@ -220,6 +221,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
       created_at: new Date().toISOString(),
       pending: true,
       statusText: uploadFile ? "正在解析文档并准备分析…" : "正在检索知识库并生成回答…",
+      executionTrace: [],
     };
     setMessages((current) => [...current, optimisticMessage, streamingMessage]);
     scheduleScrollToBottom(true);
@@ -242,6 +244,16 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           setMessages((current) => current.map((message) =>
             message.id === assistantMessageId ? { ...message, usedNotes: notes, statusText: "正在生成回答…" } : message,
           ));
+        },
+        onThinking: (step) => {
+          setMessages((current) => current.map((message) => {
+            if (message.id !== assistantMessageId) return message;
+            const trace = [...(message.executionTrace ?? [])];
+            const existingIndex = trace.findIndex((item) => item.id === step.id);
+            if (existingIndex >= 0) trace[existingIndex] = step;
+            else trace.push(step);
+            return { ...message, executionTrace: trace, statusText: step.description };
+          }));
         },
         onAttachment: (nextAttachment: AttachmentInfo) => {
           setMessages((current) => current.map((message) =>
@@ -415,6 +427,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
               <section key={turn.key} className="chat-turn">
               {turn.messages.map((message) => {
               const usedNotes = message.usedNotes ?? message.used_notes;
+              const executionTrace = message.executionTrace ?? getPersistedExecutionTrace(message);
               const displayContent = getDisplayContent(message);
               return (
               <article key={message.id} className={`message message--${message.role}`}>
@@ -428,6 +441,24 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
                   </div>
                   {message.attachment && message.role === "user" && (
                     <AttachmentPreview attachment={message.attachment} />
+                  )}
+                  {message.role === "assistant" && executionTrace.length > 0 && (
+                    <Think
+                      rootClassName="execution-think"
+                      title={message.pending ? "正在执行" : "执行过程"}
+                      loading={message.pending}
+                      defaultExpanded={message.pending}
+                      destroyOnHidden={false}
+                    >
+                      <ThoughtChain
+                        items={executionTrace.map((step) => ({
+                          key: step.id,
+                          title: step.title,
+                          description: step.description,
+                          status: step.status,
+                        }))}
+                      />
+                    </Think>
                   )}
                   {message.message_type === "form" && isChatFormDescriptor(message.message_data) ? (
                     <NoteCreateForm
@@ -567,6 +598,19 @@ function groupMessagesIntoTurns(messages: DisplayMessage[]): ConversationTurn[] 
 
 function isChatFormDescriptor(value: AgentMessage["message_data"]): value is ChatFormDescriptor {
   return Boolean(value && "kind" in value && value.kind === "note_create");
+}
+
+function getPersistedExecutionTrace(message: DisplayMessage): ExecutionStep[] {
+  const value = message.message_data;
+  if (!value || !("execution_trace" in value) || !Array.isArray(value.execution_trace)) return [];
+  return value.execution_trace.filter((item): item is ExecutionStep => {
+    if (!item || typeof item !== "object") return false;
+    const candidate = item as Partial<ExecutionStep>;
+    return typeof candidate.id === "string"
+      && typeof candidate.title === "string"
+      && typeof candidate.description === "string"
+      && ["loading", "success", "error", "abort"].includes(candidate.status ?? "");
+  });
 }
 
 function getDisplayContent(message: DisplayMessage): string {

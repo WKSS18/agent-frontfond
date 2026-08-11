@@ -23,6 +23,18 @@ export interface Note {
   updated_at: string;
 }
 
+export interface DocumentImportTask {
+  id: number;
+  filename: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  stage: "queued" | "parsing" | "creating_note" | "retrying" | "completed" | "failed";
+  note_id: number | null;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChatFormField {
   name: "title" | "content";
   label: string;
@@ -81,6 +93,13 @@ export interface AgentChatResponse {
   session_id: number;
   answer: string;
   used_notes: Note[];
+}
+
+export interface ExecutionStep {
+  id: string;
+  title: string;
+  description: string;
+  status: "loading" | "success" | "error" | "abort";
 }
 
 export type AppView = "chat" | "notes";
