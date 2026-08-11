@@ -95,6 +95,12 @@ export interface AgentChatResponse {
   used_notes: Note[];
 }
 
+export interface AgentSession {
+  id: number;
+  title: string;
+  created_at: string;
+}
+
 export interface ExecutionStep {
   id: string;
   title: string;

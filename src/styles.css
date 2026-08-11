@@ -807,6 +807,47 @@ button:disabled {
   font-size: 13px;
 }
 
+.session-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-history-item {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #e2e8e5;
+  border-radius: 10px;
+  background: #fff;
+  color: #1f2d29;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.session-history-item:hover,
+.session-history-item.is-active {
+  border-color: #71aaa0;
+  background: #f1f8f6;
+}
+
+.session-history-item strong,
+.session-history-item time {
+  display: block;
+}
+
+.session-history-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-history-item time {
+  margin-top: 5px;
+  color: #82908c;
+  font-size: 12px;
+}
+
 .message--assistant .message-content {
   white-space: normal;
 }

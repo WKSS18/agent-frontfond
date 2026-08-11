@@ -7,6 +7,7 @@
 import type {
   AgentChatResponse,
   AgentMessage,
+  AgentSession,
   AttachmentInfo,
   ChatFormDescriptor,
   Note,
@@ -353,5 +354,9 @@ export const api = {
 
   listMessages(token: string, sessionId: number): Promise<AgentMessage[]> {
     return request<AgentMessage[]>(`/agent/sessions/${sessionId}/messages`, {}, token);
+  },
+
+  listSessions(token: string): Promise<AgentSession[]> {
+    return request<AgentSession[]>("/agent/sessions", {}, token);
   },
 };

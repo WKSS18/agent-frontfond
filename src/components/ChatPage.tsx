@@ -6,13 +6,13 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { Attachments, Sender, Think, ThoughtChain, type AttachmentsProps } from "@ant-design/x";
-import { App as AntdApp, Button, Tooltip } from "antd";
-import { BookOpen, Bot, File, FileText, Image, Paperclip, Plus, UserRound } from "lucide-react";
+import { App as AntdApp, Button, Drawer, Empty, Tooltip } from "antd";
+import { BookOpen, Bot, File, FileText, History, Image, Paperclip, Plus, UserRound } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { api, ApiError, type ChatStreamCallbacks } from "../api/client";
-import type { AgentMessage, AttachmentInfo, ChatFormDescriptor, ExecutionStep, Note, UploadedFile } from "../types";
+import type { AgentMessage, AgentSession, AttachmentInfo, ChatFormDescriptor, ExecutionStep, Note, UploadedFile } from "../types";
 import { NoteCreateForm } from "./NoteCreateForm";
 
 
@@ -62,6 +62,9 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(Boolean(sessionId));
   const [noteCount, setNoteCount] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sessions, setSessions] = useState<AgentSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   // 高频流更新涉及的 DOM 和流程标记用 ref 保存，避免无意义的额外渲染。
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
@@ -323,6 +326,25 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
     autoFollowRef.current = true;
   };
 
+  const openHistory = () => {
+    setHistoryOpen(true);
+    setIsLoadingSessions(true);
+    void api.listSessions(token)
+      .then(setSessions)
+      .finally(() => setIsLoadingSessions(false));
+  };
+
+  const selectSession = (nextSessionId: number) => {
+    if (isSending || nextSessionId === sessionId) {
+      setHistoryOpen(false);
+      return;
+    }
+    localStorage.setItem(storageKey, String(nextSessionId));
+    setSessionId(nextSessionId);
+    setHistoryOpen(false);
+    autoFollowRef.current = true;
+  };
+
   const selectFile = (file: File): boolean => {
     // 前端校验用于快速反馈；后端仍会做同样校验，浏览器不能作为安全边界。
       const suffix = `.${file.name.split(".").pop()?.toLowerCase() ?? ""}`;
@@ -388,12 +410,42 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
             <BookOpen size={16} />
             <span>{noteCount} 条笔记</span>
           </div>
+          <button className="secondary-button" onClick={openHistory} disabled={isSending}>
+            <History size={17} />
+            <span>历史会话</span>
+          </button>
           <button className="secondary-button" onClick={startNewSession} disabled={isSending}>
             <Plus size={17} />
             <span>新会话</span>
           </button>
         </div>
       </header>
+
+      <Drawer
+        title="历史会话"
+        placement="right"
+        width={360}
+        open={historyOpen}
+        loading={isLoadingSessions}
+        onClose={() => setHistoryOpen(false)}
+      >
+        {sessions.length === 0 && !isLoadingSessions ? (
+          <Empty description="暂无历史会话" />
+        ) : (
+          <div className="session-history-list">
+            {sessions.map((session) => (
+              <button
+                key={session.id}
+                className={`session-history-item ${session.id === sessionId ? "is-active" : ""}`}
+                onClick={() => selectSession(session.id)}
+              >
+                <strong>{session.title}</strong>
+                <time>{formatSessionTime(session.created_at)}</time>
+              </button>
+            ))}
+          </div>
+        )}
+      </Drawer>
 
       <div
         ref={chatScrollRef}
@@ -443,22 +495,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
                     <AttachmentPreview attachment={message.attachment} />
                   )}
                   {message.role === "assistant" && executionTrace.length > 0 && (
-                    <Think
-                      rootClassName="execution-think"
-                      title={message.pending ? "正在执行" : "执行过程"}
-                      loading={message.pending}
-                      defaultExpanded={message.pending}
-                      destroyOnHidden={false}
-                    >
-                      <ThoughtChain
-                        items={executionTrace.map((step) => ({
-                          key: step.id,
-                          title: step.title,
-                          description: step.description,
-                          status: step.status,
-                        }))}
-                      />
-                    </Think>
+                    <ExecutionThink trace={executionTrace} pending={Boolean(message.pending)} />
                   )}
                   {message.message_type === "form" && isChatFormDescriptor(message.message_data) ? (
                     <NoteCreateForm
@@ -600,6 +637,37 @@ function isChatFormDescriptor(value: AgentMessage["message_data"]): value is Cha
   return Boolean(value && "kind" in value && value.kind === "note_create");
 }
 
+function ExecutionThink({ trace, pending }: { trace: ExecutionStep[]; pending: boolean }) {
+  // 折叠状态由页面控制，避免 SSE 高频更新和临时消息 ID 替换导致 Think 重新展开或动画闪烁。
+  const [expanded, setExpanded] = useState(pending);
+  const previousPendingRef = useRef(pending);
+
+  useEffect(() => {
+    if (previousPendingRef.current && !pending) setExpanded(false);
+    previousPendingRef.current = pending;
+  }, [pending]);
+
+  return (
+    <Think
+      rootClassName="execution-think"
+      title={pending ? "正在执行" : "执行过程"}
+      loading={pending}
+      expanded={expanded}
+      onExpand={setExpanded}
+      destroyOnHidden
+    >
+      <ThoughtChain
+        items={trace.map((step) => ({
+          key: step.id,
+          title: step.title,
+          description: step.description,
+          status: step.status,
+        }))}
+      />
+    </Think>
+  );
+}
+
 function getPersistedExecutionTrace(message: DisplayMessage): ExecutionStep[] {
   const value = message.message_data;
   if (!value || !("execution_trace" in value) || !Array.isArray(value.execution_trace)) return [];
@@ -642,6 +710,19 @@ function formatMessageTime(value: string): string {
   if (Number.isNaN(date.getTime())) return "--:--";
 
   return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function formatSessionTime(value: string): string {
+  const normalizedValue = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`;
+  const date = new Date(normalizedValue);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
