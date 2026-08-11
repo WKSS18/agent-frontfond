@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { App as AntdApp, ConfigProvider } from "antd";
+import { NotebookPen } from "lucide-react";
 
 import { api, ApiError } from "./api/client";
 import { registerErrorNotifier } from "./api/feedback";
@@ -81,7 +82,7 @@ function Application() {
   if (isBooting) {
     return (
       <main className="boot-screen" aria-label="Loading application">
-        <div className="brand-mark brand-mark--large">F</div>
+        <div className="brand-mark brand-mark--large"><NotebookPen size={28} /></div>
         <span className="loading-line" />
       </main>
     );

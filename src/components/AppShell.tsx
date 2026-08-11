@@ -1,6 +1,6 @@
 /** 已登录后的应用外壳：桌面/移动导航、账户区域和页面级视图切换。 */
 import { useState } from "react";
-import { BookOpen, LogOut, MessageSquareText } from "lucide-react";
+import { BookOpen, LogOut, MessageSquareText, NotebookPen } from "lucide-react";
 
 import type { AppView, User } from "../types";
 import { ChatPage } from "./ChatPage";
@@ -22,17 +22,17 @@ export function AppShell({ token, user, onLogout }: AppShellProps) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-mark">F</div>
+          <div className="brand-mark"><NotebookPen size={21} /></div>
           <div>
-            <strong>Fieldnote</strong>
-            <span>AI workspace</span>
+            <strong>知记</strong>
+            <span>AI 知识笔记</span>
           </div>
         </div>
 
         <nav className="main-nav" aria-label="Main navigation">
           <button className={view === "chat" ? "is-active" : ""} onClick={() => setView("chat")}>
             <MessageSquareText size={19} />
-            <span>Chat</span>
+            <span>知识对话</span>
           </button>
           <button className={view === "notes" ? "is-active" : ""} onClick={() => setView("notes")}>
             <BookOpen size={19} />
@@ -63,7 +63,7 @@ export function AppShell({ token, user, onLogout }: AppShellProps) {
       <nav className="mobile-nav" aria-label="Mobile navigation">
         <button className={view === "chat" ? "is-active" : ""} onClick={() => setView("chat")}>
           <MessageSquareText size={20} />
-          <span>Chat</span>
+          <span>对话</span>
         </button>
         <button className={view === "notes" ? "is-active" : ""} onClick={() => setView("notes")}>
           <BookOpen size={20} />

@@ -279,6 +279,12 @@ export const api = {
     );
   },
 
+  importNoteDocument(token: string, file: File): Promise<Note> {
+    const form = new FormData();
+    form.append("file", file);
+    return request<Note>("/notes/import", { method: "POST", body: form }, token);
+  },
+
   uploadFile(token: string, file: File): Promise<UploadedFile> {
     const form = new FormData();
     form.append("file", file);

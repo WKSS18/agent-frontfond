@@ -26,6 +26,7 @@ interface DisplayMessage extends AgentMessage {
   /** 流式阶段暂存引用和 pending 状态，历史消息仍使用服务端字段。 */
   usedNotes?: Note[];
   pending?: boolean;
+  statusText?: string;
 }
 
 interface ConversationTurn {
@@ -218,6 +219,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
       attachment: null,
       created_at: new Date().toISOString(),
       pending: true,
+      statusText: uploadFile ? "正在解析文档并准备分析…" : "正在检索知识库并生成回答…",
     };
     setMessages((current) => [...current, optimisticMessage, streamingMessage]);
     scheduleScrollToBottom(true);
@@ -238,7 +240,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
         },
         onSources: (notes) => {
           setMessages((current) => current.map((message) =>
-            message.id === assistantMessageId ? { ...message, usedNotes: notes } : message,
+            message.id === assistantMessageId ? { ...message, usedNotes: notes, statusText: "正在生成回答…" } : message,
           ));
         },
         onAttachment: (nextAttachment: AttachmentInfo) => {
@@ -252,7 +254,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           // delta 只追加到当前 pending 助手消息，形成实时打字效果。
           setMessages((current) => current.map((message) =>
             message.id === assistantMessageId
-              ? { ...message, content: message.content + delta }
+              ? { ...message, content: message.content + delta, statusText: undefined }
               : message,
           ));
         },
@@ -421,7 +423,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
                 </div>
                 <div className="message-body">
                   <div className="message-meta">
-                    <strong>{message.role === "assistant" ? "Fieldnote Agent" : "你"}</strong>
+                    <strong>{message.role === "assistant" ? "知记助手" : "你"}</strong>
                     <time>{formatMessageTime(message.created_at)}</time>
                   </div>
                   {message.attachment && message.role === "user" && (
@@ -440,8 +442,9 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
                   ) : (
                     <div className={`message-content ${message.pending ? "is-pending" : ""}`}>
                       {message.role === "assistant" && message.pending && !displayContent ? (
-                      <span className="typing-indicator" aria-label="Agent 正在思考">
-                        <span /><span /><span />
+                      <span className="stream-status" aria-live="polite">
+                        <span className="typing-indicator" aria-hidden="true"><span /><span /><span /></span>
+                        {message.statusText}
                       </span>
                       ) : message.role === "assistant" ? (
                         <Markdown remarkPlugins={MARKDOWN_PLUGINS}>{displayContent}</Markdown>

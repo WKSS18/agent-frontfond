@@ -1,6 +1,6 @@
 /** 知识笔记工作台：搜索列表、创建/编辑器、删除确认和数据刷新。 */
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { FilePlus2, Search, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { FilePlus2, Search, Trash2, Upload, X } from "lucide-react";
 
 import { api } from "../api/client";
 import type { Note } from "../types";
@@ -19,6 +19,8 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [importStatus, setImportStatus] = useState("");
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const selectedNote = useMemo(
     () => notes.find((note) => note.id === selectedId) ?? null,
@@ -90,6 +92,21 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
     }
   };
 
+  const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setImportStatus("正在上传并解析文档…");
+    try {
+      const saved = await api.importNoteDocument(token, file);
+      setImportStatus("解析完成，已创建笔记；向量索引正在后台建立。几秒后即可在 Chat 中检索。");
+      await refreshNotes();
+      setSelectedId(saved.id);
+    } catch {
+      setImportStatus("");
+    }
+  };
+
   return (
     <section className="notes-page">
       <header className="workspace-header">
@@ -97,11 +114,30 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
           <p className="eyebrow">Knowledge base</p>
           <h1>知识笔记</h1>
         </div>
-        <button className="primary-button compact-button" onClick={() => setSelectedId("new")}>
-          <FilePlus2 size={17} />
-          <span>新建笔记</span>
-        </button>
+        <div className="notes-header-actions">
+          <input
+            ref={importInputRef}
+            className="visually-hidden"
+            type="file"
+            accept=".txt,.md,.csv,.pdf,.docx,.png,.jpg,.jpeg,.webp"
+            onChange={(event) => void handleImport(event)}
+          />
+          <button
+            className="secondary-button compact-button"
+            onClick={() => importInputRef.current?.click()}
+            disabled={Boolean(importStatus.startsWith("正在"))}
+          >
+            <Upload size={17} />
+            <span>{importStatus.startsWith("正在") ? "解析中…" : "导入文档"}</span>
+          </button>
+          <button className="primary-button compact-button" onClick={() => setSelectedId("new")}>
+            <FilePlus2 size={17} />
+            <span>新建笔记</span>
+          </button>
+        </div>
       </header>
+
+      {importStatus && <div className="note-import-status" role="status">{importStatus}</div>}
 
       <div className="notes-workspace">
         <div className="notes-list-panel">

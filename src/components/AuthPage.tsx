@@ -1,6 +1,6 @@
 /** 登录/注册页：复用同一表单，注册成功后立即登录并加载当前用户。 */
 import { useState, type FormEvent } from "react";
-import { ArrowRight, BookOpen, Eye, EyeOff, MessageSquareText, ShieldCheck } from "lucide-react";
+import { ArrowRight, BookOpen, Eye, EyeOff, MessageSquareText, NotebookPen, ShieldCheck } from "lucide-react";
 
 import { api } from "../api/client";
 import type { User } from "../types";
@@ -46,8 +46,8 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     <main className="auth-layout">
       <section className="auth-intro" aria-labelledby="product-title">
         <div className="auth-brand">
-          <div className="brand-mark">F</div>
-          <span>Fieldnote AI</span>
+          <div className="brand-mark"><NotebookPen size={21} /></div>
+          <span>知记</span>
         </div>
         <div className="auth-intro-copy">
           <p className="eyebrow">Personal knowledge workspace</p>
