@@ -1,6 +1,6 @@
 /** 登录/注册页：复用同一表单，注册成功后立即登录并加载当前用户。 */
 import { useState, type FormEvent } from "react";
-import { ArrowRight, BookOpen, Eye, EyeOff, MessageSquareText, NotebookPen, ShieldCheck } from "lucide-react";
+import { ArrowRight, BookOpen, Download, Eye, EyeOff, MessageSquareText, NotebookPen, ShieldCheck } from "lucide-react";
 
 import { api } from "../api/client";
 import type { User } from "../types";
@@ -11,6 +11,7 @@ interface AuthPageProps {
 }
 
 type AuthMode = "login" | "register";
+const DESKTOP_DOWNLOAD_URL = "https://wh-syyoss.oss-cn-beijing.aliyuncs.com/releases/fieldnote/windows/fieldnote-desktop-1.0.1-x64.exe";
 
 export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const [mode, setMode] = useState<AuthMode>("login");
@@ -61,6 +62,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           <div><MessageSquareText size={18} /><span>上下文问答</span></div>
           <div><ShieldCheck size={18} /><span>账户数据隔离</span></div>
         </div>
+        <a className="desktop-download-link" href={DESKTOP_DOWNLOAD_URL}>
+          <Download size={18} />
+          <span>下载 Windows 桌面端</span>
+        </a>
       </section>
 
       <section className="auth-form-region" aria-label="Account access">
