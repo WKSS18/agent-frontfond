@@ -1,6 +1,6 @@
 # Fieldnote AI Agent 前端
 
-Fieldnote 是一个 React + TypeScript 的个人知识工作台前端，配套后端位于同级目录 `../python-agent-demo`。项目覆盖登录、知识笔记、SSE 流式聊天、Markdown、引用来源、OSS 附件、图片/文档分析、会话历史、结构化业务表单和响应式布局。
+Fieldnote 是一个 React + TypeScript 的个人知识工作台前端，配套后端位于同级目录 `../python-agent-demo`。项目覆盖登录、知识笔记、SSE 流式聊天、中文语音输入、Markdown、引用来源、OSS 附件、图片/文档分析、会话历史、结构化业务表单和响应式布局。
 
 ## 1. 已实现功能
 
@@ -20,6 +20,7 @@ Fieldnote 是一个 React + TypeScript 的个人知识工作台前端，配套�
 - 附件、用户语句和助手分析刷新后可从历史恢复。
 - 聊天内创建笔记的结构化表单和幂等完成态。
 - API 统一错误提示、GET 并发去重和本地时区显示。
+- 中文语音输入：开始/停止控制、连续识别、识别结果回填和权限/设备/网络错误提示。
 
 ## 2. 技术栈
 
@@ -34,6 +35,7 @@ Fieldnote 是一个 React + TypeScript 的个人知识工作台前端，配套�
 | remark-gfm | GFM 扩展 | 支持表格、任务列表等常见模型输出 |
 | lucide-react | 图标 | 风格统一、可按组件引入 |
 | Fetch / ReadableStream | HTTP 和 SSE | 支持 POST、Bearer Header 与流式读取 |
+| Web Speech API | 中文语音转文字 | 复用 Chromium 原生能力，不把音频上传到业务后端 |
 
 ## 3. 前端架构
 
@@ -45,7 +47,8 @@ App.tsx                     全局主题、Token、当前用户
 AppShell.tsx                导航和页面切换
   ├── NotesPage.tsx         笔记 CRUD
   └── ChatPage.tsx          会话、消息、附件、流式 UI
-        └── NoteCreateForm  受控业务表单
+        ├── NoteCreateForm  受控业务表单
+        └── useSpeechInput  语音识别生命周期与错误映射
 
 所有组件
   ▼
@@ -74,6 +77,8 @@ src/
 │   ├── ChatPage.tsx           # 聊天核心状态和渲染
 │   ├── NoteCreateForm.tsx     # 聊天内创建笔记表单
 │   └── NotesPage.tsx          # 笔记列表和编辑器
+├── hooks/
+│   └── useSpeechInput.ts      # 中文语音识别、权限错误和资源清理
 └── styles.css                 # 设计令牌、布局、Markdown、响应式样式
 vite.config.ts                 # Vite 插件和 /api 开发代理
 ```
@@ -261,6 +266,28 @@ reader.read()
 - 上传成功：使用 OSS 签名 URL。
 - 文件切换/移除/组件卸载：`URL.revokeObjectURL` 释放 Blob URL。
 
+### 12.4 中文语音输入
+
+聊天输入区的麦克风按钮通过 `useSpeechInput` 封装 Web Speech API：
+
+```text
+点击麦克风
+  -> 创建 SpeechRecognition
+  -> lang = zh-CN
+  -> continuous + interimResults
+  -> 最终识别文本追加到受控 question
+  -> 用户确认、修改后再发送
+```
+
+Hook 在组件卸载时调用 `abort()`，避免页面切换后麦克风继续占用；对权限拒绝、无录音设备、无语音和网络失败分别给出反馈。录音音频不会上传到 Fieldnote 后端，但浏览器实现可能使用浏览器厂商的在线识别服务，因此涉及敏感语音时应改为自建 ASR 服务。
+
+兼容性和部署边界：
+
+- Chrome/Edge 等 Chromium 环境优先支持，Firefox 等环境可能不提供该 API。
+- 浏览器麦克风通常只允许安全上下文（HTTPS 或 localhost）。当前公网演示站仍是 HTTP，浏览器可能拒绝语音权限；正式部署应配置域名和 HTTPS。
+- 用户必须主动点击按钮触发权限请求，页面不能自动开启麦克风。
+- API 不可用时按钮仍可见并明确提示“不支持”，普通文字输入不受影响。
+
 ## 13. 结构化表单消息
 
 聊天消息不仅是纯文本。`message_type` 作为判别字段：
@@ -338,7 +365,7 @@ SSE 代理需要注意：
 
 ### 30 秒版本
 
-> 我用 React、TypeScript、Vite 和 Ant Design X 做了一个知识库 Agent 前端。API 层统一处理 JWT、普通响应、文件上传和 POST SSE；聊天页通过乐观消息和事件回调增量更新回答，用 react-markdown 渲染模型内容，并解决了流式滚动抖动、最近问题吸顶、附件上传生命周期和刷新历史恢复。业务表单通过 message_type 和白名单 kind 显式映射，不执行模型任意动作。
+> 我用 React、TypeScript、Vite 和 Ant Design X 做了一个知识库 Agent 前端。API 层统一处理 JWT、普通响应、文件上传和 POST SSE；聊天页通过乐观消息和事件回调增量更新回答，用 react-markdown 渲染模型内容，并解决了流式滚动抖动、语音输入生命周期、最近问题吸顶、附件上传生命周期和刷新历史恢复。业务表单通过 message_type 和白名单 kind 显式映射，不执行模型任意动作。
 
 ### 2 分钟展开顺序
 

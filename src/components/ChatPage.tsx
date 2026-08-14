@@ -7,13 +7,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { Attachments, Sender, Think, ThoughtChain, type AttachmentsProps } from "@ant-design/x";
 import { App as AntdApp, Button, Drawer, Empty, Tooltip } from "antd";
-import { BookOpen, Bot, File, FileText, History, Image, Paperclip, Plus, UserRound } from "lucide-react";
+import { BookOpen, Bot, File, FileText, History, Image, Mic, MicOff, Paperclip, Plus, UserRound } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { api, ApiError, type ChatStreamCallbacks } from "../api/client";
 import type { AgentMessage, AgentSession, AttachmentInfo, ChatFormDescriptor, ExecutionStep, Note, UploadedFile } from "../types";
 import { NoteCreateForm } from "./NoteCreateForm";
+import { useSpeechInput } from "../hooks/useSpeechInput";
 
 
 interface ChatPageProps {
@@ -74,6 +75,11 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   const uploadAttemptRef = useRef(0);
   const autoFollowRef = useRef(true);
   const scrollFrameRef = useRef<number | null>(null);
+  const appendSpeech = useCallback((text: string) => {
+    setQuestion((current) => current.trim() ? `${current.trim()} ${text}` : text);
+  }, []);
+  const reportSpeechError = useCallback((text: string) => { void messageApi.warning(text); }, [messageApi]);
+  const speech = useSpeechInput(appendSpeech, reportSpeechError);
 
   useEffect(() => {
     // noteRevision 由笔记页修改成功后递增，用于同步顶部知识库数量。
@@ -555,14 +561,14 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           autoSize={{ minRows: 1, maxRows: 5 }}
           placeholder={selectedFile ? "补充分析要求（可选）" : "向你的知识库提问..."}
           prefix={(
-            <Tooltip title="上传图片或文档">
-              <Button
-                type="text"
-                icon={<Paperclip size={19} />}
-                onClick={() => attachmentsRef.current?.select({ accept: ACCEPTED_FILES })}
-                aria-label="上传图片或文档"
-              />
-            </Tooltip>
+            <div className="composer-prefix-actions">
+              <Tooltip title="上传图片或文档">
+                <Button type="text" icon={<Paperclip size={19} />} onClick={() => attachmentsRef.current?.select({ accept: ACCEPTED_FILES })} aria-label="上传图片或文档" />
+              </Tooltip>
+              <Tooltip title={speech.listening ? "停止语音输入" : speech.supported ? "语音输入" : "当前环境不支持语音识别"}>
+                <Button type="text" danger={speech.listening} icon={speech.listening ? <MicOff size={19} /> : <Mic size={19} />} onClick={speech.toggle} aria-label={speech.listening ? "停止语音输入" : "开始语音输入"} className={speech.listening ? "voice-button is-listening" : "voice-button"} />
+              </Tooltip>
+            </div>
           )}
           header={(
             <Sender.Header
