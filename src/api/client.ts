@@ -138,6 +138,7 @@ async function streamChat(
   question: string,
   sessionId: number | null,
   callbacks: ChatStreamCallbacks,
+  signal?: AbortSignal,
 ): Promise<void> {
   // 原生 EventSource 只支持 GET 且不便设置 Authorization，所以使用 fetch 读取 SSE。
   let response: Response;
@@ -150,8 +151,10 @@ async function streamChat(
         Accept: "text/event-stream",
       },
       body: JSON.stringify({ question, session_id: sessionId }),
+      signal,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     return fail("网络连接失败，请检查服务是否已启动。", 0);
   }
 
@@ -165,6 +168,7 @@ async function streamFileAnalysis(
   sessionId: number | null,
   objectKey: string,
   callbacks: ChatStreamCallbacks,
+  signal?: AbortSignal,
 ): Promise<void> {
   // 文件分析既需要二进制文件，也要携带会话、用户提示词和已上传 OSS 的对象键。
   const form = new FormData();
@@ -179,8 +183,10 @@ async function streamFileAnalysis(
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream" },
       body: form,
+      signal,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     return fail("网络连接失败，请检查服务是否已启动。", 0);
   }
   await consumeStreamResponse(response, callbacks);

@@ -421,3 +421,8 @@ SSE 代理需要注意：
 后端项目：`../python-agent-demo`
 
 后端 README 包含数据库模型、JWT、事务边界、LangGraph、RAG、文件解析、OSS 和 API 说明。面试前建议沿着“前端发送 -> Vite 代理 -> FastAPI Route -> Service -> Agent/CRUD -> SSE 返回”的完整链路走读一次。
+### 流式请求取消与竞态保护
+
+- 聊天和文件分析请求使用 `AbortController`，生成期间发送按钮切换为停止按钮，可随时终止网络流。
+- 新建会话、切换历史会话和组件卸载都会主动取消旧请求。
+- 每次生成分配单调递增的请求版本号；SSE 回调先校验版本和 `AbortSignal`，因此取消后迟到的增量不会覆盖当前会话或历史消息。

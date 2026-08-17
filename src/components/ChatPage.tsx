@@ -73,6 +73,8 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   const attachmentsRef = useRef<ComponentRef<typeof Attachments>>(null);
   const skipNextHistoryLoadRef = useRef(false);
   const uploadAttemptRef = useRef(0);
+  const generationRef = useRef(0);
+  const streamControllerRef = useRef<AbortController | null>(null);
   const autoFollowRef = useRef(true);
   const scrollFrameRef = useRef<number | null>(null);
   const appendSpeech = useCallback((text: string) => {
@@ -156,6 +158,18 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
 
   useEffect(() => () => {
     if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+    generationRef.current += 1;
+    streamControllerRef.current?.abort();
+  }, []);
+
+  const stopGeneration = useCallback(() => {
+    generationRef.current += 1;
+    streamControllerRef.current?.abort();
+    streamControllerRef.current = null;
+    setIsSending(false);
+    setMessages((current) => current.map((item) =>
+      item.pending ? { ...item, pending: false, statusText: item.role === "assistant" ? "已停止生成" : undefined } : item,
+    ));
   }, []);
 
   useEffect(() => {
@@ -197,6 +211,12 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
     setSelectedFile(null);
     setUploadedFile(null);
     setIsSending(true);
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    const controller = new AbortController();
+    streamControllerRef.current?.abort();
+    streamControllerRef.current = controller;
+    const isCurrent = () => generationRef.current === generation && !controller.signal.aborted;
     autoFollowRef.current = true;
 
     // 附件名已在 attachment 中保存，消息正文只展示用户真正发送的语句。
@@ -238,6 +258,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
     try {
       const callbacks: ChatStreamCallbacks = {
         onSession: (nextSessionId) => {
+          if (!isCurrent()) return;
           if (sessionId === null) {
             skipNextHistoryLoadRef.current = true;
             setSessionId(nextSessionId);
@@ -250,11 +271,13 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           ));
         },
         onSources: (notes) => {
+          if (!isCurrent()) return;
           setMessages((current) => current.map((message) =>
             message.id === assistantMessageId ? { ...message, usedNotes: notes, statusText: "正在生成回答…" } : message,
           ));
         },
         onThinking: (step) => {
+          if (!isCurrent()) return;
           setMessages((current) => current.map((message) => {
             if (message.id !== assistantMessageId) return message;
             const trace = [...(message.executionTrace ?? [])];
@@ -265,6 +288,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           }));
         },
         onAttachment: (nextAttachment: AttachmentInfo) => {
+          if (!isCurrent()) return;
           setMessages((current) => current.map((message) =>
             message.id === optimisticMessage.id
               ? { ...message, attachment: nextAttachment }
@@ -272,6 +296,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           ));
         },
         onDelta: (delta) => {
+          if (!isCurrent()) return;
           // delta 只追加到当前 pending 助手消息，形成实时打字效果。
           setMessages((current) => current.map((message) =>
             message.id === assistantMessageId
@@ -280,6 +305,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           ));
         },
         onForm: (form) => {
+          if (!isCurrent()) return;
           setMessages((current) => current.map((message) =>
             message.id === assistantMessageId
               ? { ...message, message_type: "form", message_data: form }
@@ -287,6 +313,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           ));
         },
         onDone: (messageId) => {
+          if (!isCurrent()) return;
           setMessages((current) => current.map((message) => {
             if (message.id === optimisticMessage.id) return { ...message, pending: false };
             if (message.id === assistantMessageId) return { ...message, id: messageId, pending: false };
@@ -302,11 +329,13 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           sessionId,
           uploadedAttachment.object_key,
           callbacks,
+          controller.signal,
         );
       } else {
-        await api.streamChat(token, trimmed, sessionId, callbacks);
+        await api.streamChat(token, trimmed, sessionId, callbacks, controller.signal);
       }
-    } catch {
+    } catch (error) {
+      if (!isCurrent() || (error instanceof DOMException && error.name === "AbortError")) return;
       setMessages((current) => current
         .filter((message) => {
           if (message.id === assistantMessageId && !message.content) return false;
@@ -318,12 +347,15 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
             : message,
         ));
     } finally {
-      setIsSending(false);
+      if (generationRef.current === generation) {
+        streamControllerRef.current = null;
+        setIsSending(false);
+      }
     }
   };
 
   const startNewSession = () => {
-    if (isSending) return;
+    stopGeneration();
     localStorage.removeItem(storageKey);
     setSessionId(null);
     setMessages([]);
@@ -341,10 +373,11 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
   };
 
   const selectSession = (nextSessionId: number) => {
-    if (isSending || nextSessionId === sessionId) {
+    if (nextSessionId === sessionId) {
       setHistoryOpen(false);
       return;
     }
+    stopGeneration();
     localStorage.setItem(storageKey, String(nextSessionId));
     setSessionId(nextSessionId);
     setHistoryOpen(false);
@@ -416,11 +449,11 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
             <BookOpen size={16} />
             <span>{noteCount} 条笔记</span>
           </div>
-          <button className="secondary-button" onClick={openHistory} disabled={isSending}>
+          <button className="secondary-button" onClick={openHistory}>
             <History size={17} />
             <span>历史会话</span>
           </button>
-          <button className="secondary-button" onClick={startNewSession} disabled={isSending}>
+          <button className="secondary-button" onClick={startNewSession}>
             <Plus size={17} />
             <span>新会话</span>
           </button>
@@ -557,7 +590,7 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           onSubmit={(value) => void sendMessage(value)}
           submitType="enter"
           loading={isSending}
-          disabled={isSending}
+          onCancel={stopGeneration}
           autoSize={{ minRows: 1, maxRows: 5 }}
           placeholder={selectedFile ? "补充分析要求（可选）" : "向你的知识库提问..."}
           prefix={(
