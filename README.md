@@ -7,6 +7,7 @@ Fieldnote 是一个 React + TypeScript 的个人知识工作台前端，配套�
 - 登录/注册一体化页面和 JWT 登录态恢复。
 - 桌面侧栏与移动底部导航。
 - 知识笔记搜索、新建、编辑和删除。
+- 可选导入 7 条真实 Agent 项目能力笔记，并通过普通 RAG 检索和引用进行面试演示。
 - 会话 ID 按用户保存，刷新后恢复历史消息。
 - 用户消息与助手占位消息乐观渲染。
 - `fetch + ReadableStream` 消费 POST SSE。
@@ -309,6 +310,9 @@ form + kind=note_create -> NoteCreateForm
 ## 14. 笔记页面
 
 NotesPage 使用本地状态管理列表、选择项和编辑草稿：
+
+- “Agent 项目笔记”调用 `/notes/agent-showcase`，首次创建、再次调用复用且不覆盖用户修改；
+- 导入后自动筛选 `[Agent项目]`，可以回到知识对话提问并查看引用；
 
 - 搜索输入使用 220ms 防抖。
 - `useMemo` 从列表派生当前选中笔记。

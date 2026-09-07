@@ -6,6 +6,7 @@
  */
 import type {
   AgentChatResponse,
+  AgentShowcaseImportResult,
   AgentMessage,
   AgentSession,
   AttachmentInfo,
@@ -133,12 +134,18 @@ type SsePayload = {
   step?: ExecutionStep;
 };
 
+export interface ChatLocation {
+  latitude: number;
+  longitude: number;
+}
+
 async function streamChat(
   token: string,
   question: string,
   sessionId: number | null,
   callbacks: ChatStreamCallbacks,
   signal?: AbortSignal,
+  location?: ChatLocation,
 ): Promise<void> {
   // 原生 EventSource 只支持 GET 且不便设置 Authorization，所以使用 fetch 读取 SSE。
   let response: Response;
@@ -150,7 +157,7 @@ async function streamChat(
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify({ question, session_id: sessionId }),
+      body: JSON.stringify({ question, session_id: sessionId, ...location }),
       signal,
     });
   } catch (error) {
@@ -288,6 +295,14 @@ export const api = {
     return request<Note>(
       "/notes",
       { method: "POST", body: JSON.stringify({ title, content }) },
+      token,
+    );
+  },
+
+  importAgentShowcase(token: string): Promise<AgentShowcaseImportResult> {
+    return request<AgentShowcaseImportResult>(
+      "/notes/agent-showcase",
+      { method: "POST" },
       token,
     );
   },

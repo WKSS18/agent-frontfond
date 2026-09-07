@@ -11,7 +11,7 @@ import { BookOpen, Bot, File, FileText, History, Image, Mic, MicOff, Paperclip, 
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { api, ApiError, type ChatStreamCallbacks } from "../api/client";
+import { api, ApiError, type ChatLocation, type ChatStreamCallbacks } from "../api/client";
 import type { AgentMessage, AgentSession, AttachmentInfo, ChatFormDescriptor, ExecutionStep, Note, UploadedFile } from "../types";
 import { NoteCreateForm } from "./NoteCreateForm";
 import { useSpeechInput } from "../hooks/useSpeechInput";
@@ -44,6 +44,21 @@ const STARTER_PROMPTS = [
 ];
 const ACCEPTED_FILES = ".txt,.md,.csv,.pdf,.docx,.png,.jpg,.jpeg,.webp";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+function isWeatherQuestion(question: string): boolean {
+  return /天气|气温|温度/.test(question);
+}
+
+function getCurrentLocation(): Promise<ChatLocation | undefined> {
+  if (!navigator.geolocation) return Promise.resolve(undefined);
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude }),
+      () => resolve(undefined),
+      { enableHighAccuracy: false, timeout: 4_000, maximumAge: 10 * 60_000 },
+    );
+  });
+}
 const MARKDOWN_PLUGINS = [remarkGfm];
 
 export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
@@ -332,7 +347,11 @@ export function ChatPage({ token, userId, noteRevision }: ChatPageProps) {
           controller.signal,
         );
       } else {
-        await api.streamChat(token, trimmed, sessionId, callbacks, controller.signal);
+        const location = isWeatherQuestion(trimmed)
+          ? await getCurrentLocation()
+          : undefined;
+        if (!isCurrent()) return;
+        await api.streamChat(token, trimmed, sessionId, callbacks, controller.signal, location);
       }
     } catch (error) {
       if (!isCurrent() || (error instanceof DOMException && error.name === "AbortError")) return;

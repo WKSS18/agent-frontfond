@@ -1,6 +1,6 @@
 /** 知识笔记工作台：搜索列表、创建/编辑器、删除确认和数据刷新。 */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { FilePlus2, Search, Trash2, Upload, X } from "lucide-react";
+import { FilePlus2, Search, Sparkles, Trash2, Upload, X } from "lucide-react";
 
 import { api } from "../api/client";
 import type { Note } from "../types";
@@ -20,6 +20,8 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [importStatus, setImportStatus] = useState("");
+  const [showcaseStatus, setShowcaseStatus] = useState("");
+  const [isShowcaseImporting, setIsShowcaseImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const selectedNote = useMemo(
@@ -122,6 +124,29 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
     }
   };
 
+  const handleShowcaseImport = async () => {
+    if (isShowcaseImporting) return;
+    setIsShowcaseImporting(true);
+    setShowcaseStatus("正在整理真实 Agent 项目能力…");
+    try {
+      const result = await api.importAgentShowcase(token);
+      setSearch("[Agent项目]");
+      const projectNotes = await api.listNotes(token, "[Agent项目]");
+      setNotes(projectNotes);
+      setSelectedId(result.notes[0]?.id ?? projectNotes[0]?.id ?? null);
+      onNotesChanged();
+      setShowcaseStatus(
+        result.created_count > 0
+          ? `已导入 ${result.created_count} 条项目笔记，可到知识对话中按推荐问题演示。`
+          : "项目笔记已经存在，保留了你后续的编辑内容。",
+      );
+    } catch {
+      setShowcaseStatus("");
+    } finally {
+      setIsShowcaseImporting(false);
+    }
+  };
+
   return (
     <section className="notes-page">
       <header className="workspace-header">
@@ -139,6 +164,15 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
           />
           <button
             className="secondary-button compact-button"
+            onClick={() => void handleShowcaseImport()}
+            disabled={isShowcaseImporting}
+            title="导入可检索、可引用的真实项目能力说明"
+          >
+            <Sparkles size={17} />
+            <span>{isShowcaseImporting ? "整理中…" : "Agent 项目笔记"}</span>
+          </button>
+          <button
+            className="secondary-button compact-button"
             onClick={() => importInputRef.current?.click()}
             disabled={Boolean(importStatus.startsWith("正在"))}
           >
@@ -153,6 +187,7 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
       </header>
 
       {importStatus && <div className="note-import-status" role="status">{importStatus}</div>}
+      {showcaseStatus && <div className="note-import-status" role="status">{showcaseStatus}</div>}
 
       <div className="notes-workspace">
         <div className="notes-list-panel">

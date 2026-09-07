@@ -35,6 +35,14 @@ export interface DocumentImportTask {
   updated_at: string;
 }
 
+export interface AgentShowcaseImportResult {
+  version: string;
+  created_count: number;
+  reused_count: number;
+  notes: Note[];
+  suggested_questions: string[];
+}
+
 export interface ChatFormField {
   name: "title" | "content";
   label: string;
