@@ -12,6 +12,8 @@ import type {
   AttachmentInfo,
   ChatFormDescriptor,
   Note,
+  NoteReview,
+  VoiceRoom,
   DocumentImportTask,
   ExecutionStep,
   TokenResponse,
@@ -375,6 +377,14 @@ export const api = {
 
   listMessages(token: string, sessionId: number): Promise<AgentMessage[]> {
     return request<AgentMessage[]>(`/agent/sessions/${sessionId}/messages`, {}, token);
+  },
+
+  reviewNote(token: string, noteId: number): Promise<NoteReview> {
+    return request<NoteReview>(`/notes/${noteId}/review`, { method: "POST" }, token);
+  },
+
+  createVoiceRoom(token: string, noteId: number): Promise<VoiceRoom> {
+    return request<VoiceRoom>(`/notes/${noteId}/voice-room`, { method: "POST" }, token);
   },
 
   listSessions(token: string): Promise<AgentSession[]> {

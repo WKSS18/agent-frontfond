@@ -1,6 +1,10 @@
-18:33:12 [vite] (client) [console.error] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead.
-18:33:18 [vite] (client) [console.error] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead.
-18:33:25 [vite] (client) [console.error] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead.
-18:33:31 [vite] (client) [console.error] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead.
-18:43:25 [vite] (client) [console.error] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead.
-15:41:40 [vite] (client) [console.error] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead.
+npm warn Unknown user config "home". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+11:47:00 [vite] (client) [console.error] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead.
+14:46:31 [vite] (client) [console.error] Warning: [antd: Drawer] `width` is deprecated. Please use `size` instead.
+14:47:11 [vite] (client) [Unhandled rejection] InvalidStateError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': Failed to set remote answer sdp: Called in wrong state: stable
+
+14:47:11 [vite] (client) [Unhandled rejection] InvalidStateError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': Failed to set remote answer sdp: Called in wrong state: stable
+
+15:30:04 [vite] ws proxy error:
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)

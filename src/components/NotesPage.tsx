@@ -1,9 +1,13 @@
 /** 知识笔记工作台：搜索列表、创建/编辑器、删除确认和数据刷新。 */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { FilePlus2, Search, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { FilePlus2, Search, Sparkles, Trash2, Upload, X, BrainCircuit, Mic } from "lucide-react";
 
 import { api } from "../api/client";
-import type { Note } from "../types";
+import type { Note, NoteReview } from "../types";
+import type { VoiceRoom as VoiceRoomData } from "../types";
+import { VoiceRoom } from "./VoiceRoom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 
 interface NotesPageProps {
@@ -22,6 +26,10 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
   const [importStatus, setImportStatus] = useState("");
   const [showcaseStatus, setShowcaseStatus] = useState("");
   const [isShowcaseImporting, setIsShowcaseImporting] = useState(false);
+  const [review, setReview] = useState<NoteReview | null>(null);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [voiceRoom, setVoiceRoom] = useState<VoiceRoomData | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const selectedNote = useMemo(
@@ -51,6 +59,21 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
       setContent(selectedNote.content);
     }
   }, [selectedId, selectedNote]);
+
+  useEffect(() => { setReview(null); setPreviewMode(false); }, [selectedId]);
+
+  const handleReview = async () => {
+    if (typeof selectedId !== "number") return;
+    setIsReviewing(true);
+    try { setReview(await api.reviewNote(token, selectedId)); }
+    catch (error) { window.alert(error instanceof Error ? error.message : "复盘失败"); }
+    finally { setIsReviewing(false); }
+  };
+  const handleVoiceRoom = async () => {
+    if (typeof selectedId !== "number") return;
+    try { const room = await api.createVoiceRoom(token, selectedId); setVoiceRoom(room); await navigator.clipboard?.writeText(`${location.origin}/?voice_room=${room.room_id}`); }
+    catch (error) { window.alert(error instanceof Error ? error.message : "语音房创建失败"); }
+  };
 
   const refreshNotes = async () => {
     // 修改后既刷新当前列表，也通知 ChatPage 更新知识库状态。
@@ -237,6 +260,7 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
               <div className="editor-toolbar">
                 <span>{selectedId === "new" ? "新笔记" : "编辑笔记"}</span>
                 <div>
+                  {typeof selectedId === "number" && <button type="button" className="text-button" onClick={() => setPreviewMode((value) => !value)}>{previewMode ? "编辑" : "Markdown 预览"}</button>}
                   {typeof selectedId === "number" && (
                     <button
                       type="button"
@@ -268,15 +292,19 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
                 maxLength={200}
                 required
               />
-              <textarea
-                className="note-content-input"
-                value={content}
-                onChange={(event) => setContent(event.target.value)}
-                placeholder="记录可供 Agent 检索的内容..."
-                required
-              />
+              {previewMode ? (
+                <article className="note-markdown-preview"><ReactMarkdown remarkPlugins={[remarkGfm]}>{content || "（暂无内容）"}</ReactMarkdown></article>
+              ) : (
+                <textarea className="note-content-input" value={content} onChange={(event) => setContent(event.target.value)} placeholder="记录可供 Agent 检索的内容..." required />
+              )}
               <div className="editor-footer">
                 <span>{content.length} 字符</span>
+                {typeof selectedId === "number" && (
+                  <button type="button" className="secondary-button compact-button" onClick={() => void handleReview()} disabled={isReviewing}>
+                    <BrainCircuit size={16} /> {isReviewing ? "复盘中…" : "生成今日复盘"}
+                  </button>
+                )}
+                {typeof selectedId === "number" && <button type="button" className="secondary-button compact-button" onClick={() => void handleVoiceRoom()}><Mic size={16} />语音复盘</button>}
                 <button
                   type="submit"
                   className="primary-button compact-button"
@@ -285,6 +313,15 @@ export function NotesPage({ token, onNotesChanged }: NotesPageProps) {
                   {isSaving ? "保存中..." : "保存笔记"}
                 </button>
               </div>
+              {review && (
+                <div className="note-review-card">
+                  <strong>今日复盘</strong><p>{review.summary}</p>
+                  <b>关键点</b><ul>{review.key_points.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <b>自测题</b><ul>{review.questions.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <b>待办</b><ul>{review.todo_items.map((item) => <li key={item}>{item}</li>)}</ul>
+                </div>
+              )}
+              {voiceRoom && <VoiceRoom token={token} room={voiceRoom} onClose={() => setVoiceRoom(null)} />}
             </form>
           )}
         </div>

@@ -1,5 +1,11 @@
 
-  VITE v8.2.1  ready in 521 ms
+> ai-agent-demo-web@0.1.0 dev
+> vite --host 127.0.0.1
+
+
+  VITE v8.2.1  ready in 398 ms
 
   ➜  Local:   http://127.0.0.1:5173/
   ➜  press h + enter to show help
+15:07:32 [vite] (client) hmr update /src/components/VoiceRoom.tsx
+15:08:04 [vite] (client) hmr update /src/components/VoiceRoom.tsx

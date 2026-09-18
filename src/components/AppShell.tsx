@@ -5,6 +5,8 @@ import { BookOpen, LogOut, MessageSquareText, NotebookPen } from "lucide-react";
 import type { AppView, User } from "../types";
 import { ChatPage } from "./ChatPage";
 import { NotesPage } from "./NotesPage";
+import { VoiceRoom } from "./VoiceRoom";
+import type { VoiceRoom as VoiceRoomData } from "../types";
 
 
 interface AppShellProps {
@@ -14,7 +16,11 @@ interface AppShellProps {
 }
 
 export function AppShell({ token, user, onLogout }: AppShellProps) {
-  const [view, setView] = useState<AppView>("chat");
+  // 兼容标准查询参数和历史上被复制成路径的邀请链接：/voice_room=xxxx。
+  const inviteRoomId = new URLSearchParams(window.location.search).get("voice_room")
+    ?? window.location.pathname.match(/^\/voice_room=([^/]+)$/)?.[1]
+    ?? null;
+  const [view, setView] = useState<AppView>(inviteRoomId ? "notes" : "chat");
   const [noteRevision, setNoteRevision] = useState(0);
   // Notes 修改后递增版本号，让常驻 ChatPage 重新获取知识库数量而无需全局状态库。
 
@@ -53,7 +59,9 @@ export function AppShell({ token, user, onLogout }: AppShellProps) {
       </aside>
 
       <main className="workspace">
-        {view === "chat" ? (
+        {inviteRoomId ? (
+          <VoiceRoomInvite token={token} roomId={inviteRoomId} onClose={() => window.history.replaceState({}, "", window.location.pathname)} />
+        ) : view === "chat" ? (
           <ChatPage token={token} userId={user.id} noteRevision={noteRevision} />
         ) : (
           <NotesPage token={token} onNotesChanged={() => setNoteRevision((value) => value + 1)} />
@@ -76,4 +84,9 @@ export function AppShell({ token, user, onLogout }: AppShellProps) {
       </nav>
     </div>
   );
+}
+
+function VoiceRoomInvite({ token, roomId, onClose }: { token: string; roomId: string; onClose: () => void }) {
+  const room: VoiceRoomData = { room_id: roomId, note_id: 0, expires_at: "" };
+  return <section className="voice-invite-page"><VoiceRoom token={token} room={room} onClose={onClose} /></section>;
 }

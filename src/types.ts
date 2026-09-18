@@ -23,6 +23,23 @@ export interface Note {
   updated_at: string;
 }
 
+export interface NoteReview {
+  id: number;
+  note_id: number;
+  review_date: string;
+  summary: string;
+  key_points: string[];
+  questions: string[];
+  todo_items: string[];
+  created_at: string;
+}
+
+export interface VoiceRoom {
+  room_id: string;
+  note_id: number;
+  expires_at: string;
+}
+
 export interface DocumentImportTask {
   id: number;
   filename: string;
