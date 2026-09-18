@@ -8,3 +8,4 @@ npm warn Unknown user config "home". This will stop working in the next major ve
 15:30:04 [vite] ws proxy error:
 Error: read ECONNRESET
     at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+^C
