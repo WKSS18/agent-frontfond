@@ -1,17 +1,5 @@
 
-> ai-agent-demo-web@0.1.0 dev
-> vite
+  VITE v8.2.1  ready in 521 ms
 
-
-  [32m[1mVITE[22m v8.2.1[39m  [2mready in [0m[1m358[22m[2m[0m ms[22m
-
-  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
-[2m11:26:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AuthPage.tsx[22m
-[2m11:26:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
-[2m17:30:44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/ChatPage.tsx[22m
-[2m17:31:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
-[2m17:31:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
-[2m17:32:57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles.css[22m
-[2m16:42:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/components/AuthPage.tsx, /src/components/NotesPage.tsx, /src/components/ChatPage.tsx, /src/components/NoteCreateForm.tsx[22m
-[2m16:42:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/ChatPage.tsx[22m
-[2m16:42:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/components/AuthPage.tsx, /src/components/NotesPage.tsx, /src/components/ChatPage.tsx, /src/components/NoteCreateForm.tsx[22m
+  ➜  Local:   http://127.0.0.1:5173/
+  ➜  press h + enter to show help
